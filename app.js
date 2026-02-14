@@ -3,26 +3,23 @@ let currentToken = null;
 let solPriceUSD = 0;
 let displayPref = localStorage.getItem("displayPref") || "usd";
 
-/* -------------- TABS ---------------- */
+// ------------------ TABS ------------------
 function switchTab(tabId){
-  document.querySelectorAll(".tab-content").forEach(t=>t.style.display="none");
+  document.querySelectorAll(".tab-content").forEach(t => t.style.display="none");
   document.getElementById(tabId).style.display="block";
-  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   document.querySelector(`button[onclick*="${tabId}"]`).classList.add("active");
 }
 
-/* -------------- WALLET ---------------- */
+// ------------------ WALLET ------------------
 function createUser(){
   const name = username.value.trim();
   if(!name) return;
   const wallet = {user:name, sol:1, tokens:{}};
-  localStorage.setItem("wallet", JSON.stringify(wallet));
+  saveWallet(wallet);
   localStorage.setItem("history", JSON.stringify([]));
   startApp();
 }
-
-function getWallet(){ return JSON.parse(localStorage.getItem("wallet")) || null; }
-function saveWallet(w){ localStorage.setItem("wallet", JSON.stringify(w)); }
 
 function startApp(){
   const w = getWallet();
@@ -33,6 +30,9 @@ function startApp(){
   refreshAll();
   setInterval(refreshAll, 5000);
 }
+
+function getWallet(){ return JSON.parse(localStorage.getItem("wallet")) || null; }
+function saveWallet(w){ localStorage.setItem("wallet", JSON.stringify(w)); }
 
 function resetWallet(){
   const w = getWallet();
@@ -47,14 +47,14 @@ function updateBalance(){
   solBalance.innerText = `SOL: ${w.sol.toFixed(4)}`;
 }
 
-/* -------------- SETTINGS ---------------- */
+// ------------------ SETTINGS ------------------
 function updateDisplayPref(){
   displayPref = document.getElementById("displayPref").value;
   localStorage.setItem("displayPref", displayPref);
   refreshAll();
 }
 
-/* -------------- GLOBAL REFRESH ---------------- */
+// ------------------ GLOBAL REFRESH ------------------
 async function refreshAll(){
   await fetchSolPrice();
   updateBalance();
@@ -63,7 +63,7 @@ async function refreshAll(){
   refreshHistory();
 }
 
-/* -------------- SOL PRICE ---------------- */
+// ------------------ SOL PRICE ------------------
 async function fetchSolPrice(){
   try{
     const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
@@ -72,7 +72,7 @@ async function fetchSolPrice(){
   } catch(e){ console.log("Fehler Sol Price:", e);}
 }
 
-/* -------------- TOKEN SEARCH ---------------- */
+// ------------------ TOKEN SEARCH ------------------
 async function searchToken(){
   const caVal = ca.value.trim();
   if(!caVal) return;
@@ -80,7 +80,6 @@ async function searchToken(){
     const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${caVal}`);
     const data = await res.json();
     if(!data.pairs?.length) return alert("Token nicht gefunden");
-
     const p = data.pairs[0];
     currentToken = {
       ca: caVal,
@@ -92,13 +91,12 @@ async function searchToken(){
       liq: p.liquidity.usd,
       mcap: p.fdv
     };
-
     renderTokenUI();
     loadChart();
-  } catch(e){ alert("Fehler beim Tokenladen"); console.log(e); }
+  } catch(e){ alert("Fehler beim Tokenladen"); console.log(e);}
 }
 
-/* -------------- RENDER TOKEN ---------------- */
+// ------------------ RENDER TOKEN ------------------
 function renderTokenUI(){
   if(!currentToken) return;
   tokenView.innerHTML = `
@@ -116,11 +114,12 @@ function renderTokenUI(){
       <button onclick="sellPercent(0.5)">50%</button>
       <button onclick="sellToken()">Custom</button>
     </div>
+    <button onclick="refreshTradeUI()">Refresh Token</button>
   </div>`;
   refreshTradeUI();
 }
 
-/* -------------- REFRESH TRADE ---------------- */
+// ------------------ REFRESH TRADE ------------------
 async function refreshTradeUI(){
   if(!currentToken) return;
 
@@ -142,14 +141,14 @@ async function refreshTradeUI(){
   refreshPortfolio();
 }
 
-/* -------------- BUY / SELL ---------------- */
+// ------------------ BUY / SELL ------------------
 async function buyToken(){
   const w = getWallet();
   let sol = Number(document.getElementById("buyAmount").value);
   if(!sol || sol <= 0) return alert("Gib einen Betrag ein");
   if(sol + TX_FEE > w.sol) return alert("Nicht genug SOL");
 
-  // Marktpreis zum Zeitpunkt des Kaufs abrufen
+  // Preis zum Kaufzeitpunkt abrufen
   let priceNow = currentToken.price;
   try{
     const res = await fetch(`https://api.dexscreener.com/latest/dex/pairs/solana/${currentToken.pair}`);
@@ -157,26 +156,17 @@ async function buyToken(){
     if(p) priceNow = Number(p.priceUsd);
   } catch(e){ console.log("Fehler beim Preis abrufen", e); }
 
-  // korrekte Tokenmenge basierend auf investiertem SOL und Preis zum Kaufzeitpunkt
   const tokensReceived = sol / priceNow;
 
   w.sol -= sol + TX_FEE;
 
   if(!w.tokens[currentToken.ca])
-    w.tokens[currentToken.ca] = {
-      amount: 0,
-      totalInvested: 0,
-      name: currentToken.name,
-      icon: currentToken.icon,
-      avgPrice: 0
-    };
+    w.tokens[currentToken.ca] = {amount:0, totalInvested:0, name:currentToken.name, icon:currentToken.icon, avgPrice:0};
 
   const token = w.tokens[currentToken.ca];
-
-  // Update Tokenmenge und durchschnittlichen Kaufpreis für späteres PnL
   token.amount += tokensReceived;
   token.totalInvested += sol;
-  token.avgPrice = token.totalInvested / token.amount; // avg SOL pro Token
+  token.avgPrice = token.totalInvested / token.amount;
 
   saveWallet(w);
   logHistory("BUY", currentToken.symbol, tokensReceived, priceNow);
@@ -189,18 +179,16 @@ function sellToken(){
   if(!t) return;
 
   let val = parseFloat(document.getElementById("sellInput").value);
-  if(!val || val<=0) return;
+  if(!val || val <=0) return;
   val = Math.min(val, t.amount);
 
   const solReceived = val * currentToken.price;
   w.sol += solReceived - TX_FEE;
 
-  // proportionale Reduktion totalInvested
   const fraction = val / t.amount;
   t.totalInvested -= t.totalInvested * fraction;
-
   t.amount -= val;
-  if(t.amount<=0) delete w.tokens[currentToken.ca];
+  if(t.amount <=0) delete w.tokens[currentToken.ca];
 
   saveWallet(w);
   logHistory("SELL", currentToken.symbol, val, currentToken.price);
@@ -218,14 +206,14 @@ function sellPercent(p){
 
   t.totalInvested -= t.totalInvested * p;
   t.amount -= val;
-  if(t.amount<=0) delete w.tokens[currentToken.ca];
+  if(t.amount <=0) delete w.tokens[currentToken.ca];
 
   saveWallet(w);
   logHistory("SELL", currentToken.symbol, val, currentToken.price);
   refreshAll();
 }
 
-/* -------------- TRADE PnL ---------------- */
+// ------------------ TRADE PnL ------------------
 function updateTradePnL(){
   if(!currentToken) return;
   const w = getWallet();
@@ -237,13 +225,13 @@ function updateTradePnL(){
   document.getElementById("tradePnL").innerText = display;
 }
 
-/* -------------- PORTFOLIO ---------------- */
+// ------------------ PORTFOLIO ------------------
 async function refreshPortfolio(){
   const w = getWallet();
   portfolio.innerHTML = "";
 
   let totalSOL = w.sol;
-  let totalUSD = w.sol*solPriceUSD;
+  let totalUSD = w.sol * solPriceUSD;
 
   // SOL
   const solDiv = document.createElement("div");
@@ -259,7 +247,7 @@ async function refreshPortfolio(){
   );
   const results = await Promise.all(requests);
 
-  entries.forEach(([ca,t],i)=>{
+  entries.forEach(([ca,t], i)=>{
     const data = results[i];
     if(!data?.pairs?.length) return;
 
@@ -269,9 +257,8 @@ async function refreshPortfolio(){
     const pnlSOL = (t.amount*price) - t.totalInvested;
     const displayPnl = displayPref==="usd" ? `$${(pnlSOL*solPriceUSD).toFixed(2)}` : `${pnlSOL.toFixed(4)} SOL`;
 
-    // Total Worth: SOL im Wallet + investiertes SOL + PnL aller Tokens
     totalSOL += t.totalInvested + pnlSOL;
-    totalUSD += (t.totalInvested + pnlSOL)*solPriceUSD;
+    totalUSD += (t.totalInvested + pnlSOL) * solPriceUSD;
 
     const div = document.createElement("div");
     div.className = "coin";
@@ -289,7 +276,7 @@ async function refreshPortfolio(){
     : `Total Worth: ${totalSOL.toFixed(4)} SOL`;
 }
 
-/* -------------- HISTORY ---------------- */
+// ------------------ HISTORY ------------------
 function logHistory(type,symbol,amount,price){
   const hist = JSON.parse(localStorage.getItem("history")||"[]");
   hist.push({type,symbol,amount,price,date:new Date().toLocaleString()});
@@ -309,9 +296,14 @@ function refreshHistory(){
   });
 }
 
-/* -------------- CHART ---------------- */
+// ------------------ CHART ------------------
 function loadChart(){
   if(!currentToken) return;
   chartFrame.src = `https://dexscreener.com/solana/${currentToken.pair}?embed=1`;
   chartTitle.innerText = `${currentToken.name} Chart`;
 }
+
+// ------------------ AUTO LOAD WALLET ------------------
+window.addEventListener("load", ()=>{
+  if(getWallet()) startApp();
+});
