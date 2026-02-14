@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solana Trading Simulator</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="loginBox" class="card login-card">
+  <h2>Wallet erstellen</h2>
+  <input id="username" placeholder="Username">
+  <button onclick="createUser()">Start</button>
+</div>
+
+<div id="app" style="display:none">
+
+  <div class="top-bar card">
+    <span id="solBalance">SOL: 0</span>
+    <button onclick="refreshAll()">Refresh</button>
+    <button onclick="resetWallet()">Reset Wallet</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('portfolioTab')">Portfolio</button>
+    <button class="tab-btn" onclick="switchTab('tradeTab')">Trade</button>
+    <button class="tab-btn" onclick="switchTab('chartTab')">Chart</button>
+    <button class="tab-btn" onclick="switchTab('historyTab')">History</button>
+    <button class="tab-btn" onclick="switchTab('settingsTab')">Settings</button>
+  </div>
+
+  <!-- Portfolio -->
+  <div id="portfolioTab" class="tab-content">
+    <div class="card portfolio-card">
+      <h3>Portfolio</h3>
+      <div id="portfolio"></div>
+      <div id="totalWorth"></div>
+    </div>
+  </div>
+
+  <!-- Trade -->
+  <div id="tradeTab" class="tab-content" style="display:none">
+    <div class="card trade-search">
+      <input id="ca" placeholder="Paste Contract Address">
+      <button onclick="searchToken()">Search Token</button>
+    </div>
+    <div id="tokenView"></div>
+  </div>
+
+  <!-- Chart -->
+  <div id="chartTab" class="tab-content" style="display:none">
+    <div class="card">
+      <h3 id="chartTitle">Chart</h3>
+      <iframe id="chartFrame"></iframe>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div id="historyTab" class="tab-content" style="display:none">
+    <div class="card portfolio-card">
+      <h3>History</h3>
+      <div id="history"></div>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div id="settingsTab" class="tab-content" style="display:none">
+    <div class="card">
+      <h3>Einstellungen</h3>
+      <label>Anzeige PnL / Wert:</label><br>
+      <select id="displayPref" onchange="updateDisplayPref()">
+        <option value="sol">SOL</option>
+        <option value="usd">USD</option>
+      </select>
+    </div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
